@@ -5,24 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v2"
 )
 
-type fileFormat struct {
-	Name           string
-	Version        string
-	DefaultTimeout int       "default_timeout"
-	Commands       []command "commands"
-}
-
-type command struct {
+type Command struct {
 	Command  string              "command"
 	Required []map[string]string "required"
 	Timeout  int                 "timeout"
@@ -37,18 +27,16 @@ type appError struct {
 	Code    int
 }
 
-type FileCache map[string]struct {
-	file fileFormat
-	time int64
-}
-
-var filecache = make(FileCache)
-
 const fileCacheTime = 30   // seconds
 const default_timeout = 10 // seconds
 
+func New(cmd Command) bool {
+	return true
+}
+
 func RenderFile(file string, parameters map[string][]string, w http.ResponseWriter) {
 	filedata := readFile(file)
+	fmt.Println(filecache)
 
 	if err := checkRequiredParameters(filedata, parameters); err != nil {
 		var errorData appError
@@ -150,26 +138,4 @@ func ResponseToText(response jsonResponse) string {
 func ResponseToJSON(response interface{}) string {
 	encode, _ := json.Marshal(response)
 	return string(encode)
-}
-
-func readFile(file string) fileFormat {
-	var filedata fileFormat
-	if filecache[file].time <= time.Now().Unix()-fileCacheTime {
-		// cache does not exist. read config file
-		source, err := ioutil.ReadFile(file)
-		if err != nil {
-			panic(err)
-		}
-		err = yaml.Unmarshal(source, &filedata)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("ReadFile %s: %v\n", file, filedata)
-
-		var tmp = filecache[file]
-		tmp.file = filedata
-		tmp.time = time.Now().Unix()
-		filecache[file] = tmp
-	}
-	return filecache[file].file
 }
