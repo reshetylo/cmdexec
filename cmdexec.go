@@ -18,6 +18,8 @@ type Command struct {
 	Timeout  int                 "timeout"
 }
 
+type Commands []Command
+
 type jsonResponse struct {
 	Result map[string]string
 }
@@ -30,8 +32,41 @@ type appError struct {
 const fileCacheTime = 30   // seconds
 const default_timeout = 10 // seconds
 
-func New(cmd Command) bool {
-	return true
+func New() *Commands {
+	cmds := new(Commands)
+	return cmds
+}
+
+func (c *Commands) AddCommand(cmd Command) {
+	*c = append(*c, cmd)
+}
+
+func (c *Commands) RunCommands() string {
+	response := ""
+	for _, cmd := range *c {
+		response += cmd.Run()
+	}
+	return response
+}
+
+func (c *Command) Run() string {
+	fmt.Printf("Running: %v\n", c)
+	var args []string
+	command := strings.Split(c.Command, " ")
+	if len(command) > 1 {
+		args = command[1:]
+	}
+	if c.Timeout == 0 {
+		c.Timeout = default_timeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.Timeout)*time.Second)
+	defer cancel()
+	result, err := exec.CommandContext(ctx, command[0], args...).Output()
+	if err != nil {
+		fmt.Printf("Error %v: %v. Res: %s \n", command[0], err, result)
+	}
+	fmt.Printf("Command %v: Timeout: %d = %s\n", c, c.Timeout, result)
+	return string(result[:])
 }
 
 func RenderFile(file string, parameters map[string][]string, w http.ResponseWriter) {
@@ -86,6 +121,10 @@ func ExecFile(file string, parameters map[string][]string) string {
 	}
 
 	return ResponseToText(returndata)
+}
+
+func InteractiveExec(w http.ResponseWriter, file string, parameters map[string][]string) {
+
 }
 
 func RunCommand(cmd string, timeout int, args []string) string {
